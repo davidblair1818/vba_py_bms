@@ -1,0 +1,100 @@
+Option Compare Database
+Private Sub ctrl_INST_ID_Change()
+' BELL'S MUSIC SHOP RENTAL ORDER COSTS CONSOLIDATE PROCESS--------------------------
+' PROGRAMMER: DAVID BLAIR 817-403-2685 davidblair@bellsmusicshop.com ---------------
+' CREATED 04/21/2016, LAST UPDATED 04/21/2016 --------------------------------------
+
+' DEFINE OBJECT DESCRIPTIONS -------------------------------------------------------
+    Dim dbs As Database
+    Dim rsOrders As Recordset
+    Dim rsInst As Recordset
+    Dim rsAcc As Recordset
+    Dim rstAcc As Recordset
+    Set dbs = CurrentDb
+' DEFINE VARIABLES --------------------------------
+    Dim txtPause As Variant
+    Dim strOrdersID, strInstID, strInstIDa, strSchool, strAccID As String
+    Dim curInstCost, curAmtDue, curAccCosts, curMonPmt As Currency
+    Dim intRecPosO, intRecPosA, intCountO, intCountA, intQtyA As Integer
+    Dim intCountLoop As Integer
+' REPAINT FORM!0_ORDERS
+GoTo Skip1
+Skip1:
+    DoCmd.RunCommand acCmdSaveRecord
+    DoCmd.RepaintObject acForm, "0_ORDERS"
+    DoCmd.RunCommand acCmdRefresh
+
+' ESTABLISH OBJECT DEFINITIONS --------------------
+    strOrdersID = [Forms]![0_ORDERS]![ctrl_ORDER_ID]
+    strInstID = [Forms]![0_ORDERS]![ctrl_INST_ID]
+    strSchool = [Forms]![0_ORDERS]![ctrl_SCHOOL_NAME]
+    Set rsOrders = dbs.OpenRecordset("SELECT ORDER_ID, ORDER_TYPE, SCHOOL_NAME, " & _
+        "INST_ID, INST_TOTAL_COST, ACC_TOTAL_COST, AMOUNT_DUE, MONTHLY_PAYMENT " & _
+        "FROM ORDERS WHERE ORDER_ID = " & strOrdersID & "", dbOpenDynaset)
+    Set rsInst = dbs.OpenRecordset("SELECT INST_ID, PRICE_TOTAL, TOTAL_PMT, " & _
+        "SCHOOLS FROM INSTRUMENTS WHERE INST_ID = """ & strInstID & """", dbOpenDynaset)
+    Set rsAcc = dbs.OpenRecordset("SELECT * FROM ACCESSORIES WHERE " & _
+        "ACC_MARK = TRUE", dbOpenDynaset)
+' BEGIN PROCESS -----------------------------------
+' LOAD & RUN QUERY RESET SELECTED ACCESSORIES FOR ITEM
+    DoCmd.SetWarnings (OFF)
+    DoCmd.OpenQuery "Q_ACC_SELECTED_FALSE", acViewNormal, acEdit
+    DoCmd.OpenQuery "Q_ACC_SELECTED_TRUE", acViewNormal, acEdit
+' INITIALIZE VARIABLES ----------------------------
+    curInstCost = rsInst![PRICE_TOTAL]
+    curMonPmt = rsInst![TOTAL_PMT]
+    curAccCosts = 0
+    curAmtDue = 0
+    intRecPosO = rsOrders.AbsolutePosition
+    intRecPosI = rsInst.AbsolutePosition
+    intRecPosA = rsAcc.AbsolutePosition
+    intCountA = 0
+    intCountLoop = 0
+' ORDERS TABLE REC POS  ---------------------------
+    If rsOrders.AbsolutePosition > -1 Then
+        rsOrders.MoveLast
+        intCountO = rsOrders.AbsolutePosition + 1
+        rsOrders.MoveFirst
+    End If
+' INSTRUMENTS TABLE REC POS -----------------------
+    If rsInst.AbsolutePosition > -1 Then
+        rsInst.MoveLast
+        intCountI = rsInst.AbsolutePosition + 1
+        rsInst.MoveFirst
+    End If
+' ACCESSORIES TABLE REC POS -----------------------
+    If rsAcc.AbsolutePosition > -1 Then
+        rsAcc.MoveLast
+        intCountA = rsAcc.AbsolutePosition + 1
+        rsAcc.MoveFirst
+    End If
+' PROCESS ACCESSORIES COSTS TOTAL ----------------
+    intQtyA = 0
+    For I = 0 To intCountA - 1
+        With rsAcc
+            If rsAcc![ACC_MARK] = True Then
+                intRecPosA = rsAcc.AbsolutePosition
+                intQtyA = intQtyA + 1
+                curAccCosts = curAccCosts + ![ACC_COST]
+                .Edit
+                ![ACC_MARK] = False
+                .Update
+            End If
+        End With
+        rsAcc.MoveNext
+    Next I
+    curAmtDue = curMonPmt + curAccCosts
+' UPDATE 0_ORDERS FORM ACCESSORIES COSTS TOTAL ---
+    [Forms]![0_ORDERS]![ctrl_INST_COST_TOTAL] = curInstCost
+    [Forms]![0_ORDERS]![ctrl_MONTHLY_PAYMENT] = curMonPmt
+    [Forms]![0_ORDERS]![ctrl_ACC_COST_TOTAL] = curAccCosts
+    [Forms]![0_ORDERS]![ctrl_AMOUNT_DUE] = curAmtDue
+'    DoCmd.Requery Me.ctrl_ACC_COST_TOTAL
+GoTo Next2
+Next1:
+    DoCmd.RunCommand acCmdSaveRecord
+    DoCmd.RepaintObject acForm, "0_ORDERS"
+    DoCmd.RunCommand acCmdRefresh
+GoTo Next2
+Next2:
+End Sub
